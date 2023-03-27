@@ -96,7 +96,7 @@ def get_text_messages(message):
     with app.app_context():
         try:
             decoded_token = jwt.decode(message.text, options={"verify_signature": False})
-            bot.send_message(message.chat.id, decoded_token.get('sub'))
+            bot.send_message(message.chat.id, 'Токен записан')
             User.change_tg_id(tg_id=message.chat.id, id=decoded_token.get('sub'))
             db.session.commit()
         except DecodeError:
