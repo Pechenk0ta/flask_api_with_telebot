@@ -2,7 +2,7 @@ from db import db
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import create_access_token
 from flask import jsonify
-from flask import current_app
+
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)

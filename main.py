@@ -1,17 +1,26 @@
 from flask import Flask, request
 from db import db
-from task import Tasks
-from User import User
+from taskservice import Tasks
+from Userservice import User
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity
 import telebot
 import threading
 from jwt.exceptions import DecodeError
 import jwt
+from celery import Celery
+import datetime
+from datetime import timedelta
 
 app = Flask(__name__)
 app.config.from_object('config')
 bot = telebot.TeleBot('6099114734:AAFSEh5JmeDXEt96HKiQmp5VrSCy8olDGmo')
 
+celery = Celery(app.name, broker=app.config['CELERY_BROKER_URL'])
+app.config.update(
+    CELERY_INCLUDE=['tasks'],
+    CELERY_BROKER_URL='redis://localhost:6379',
+    CELERY_RESULT_BACKEND='redis://localhost:6379'
+)
 db.init_app(app)
 jwt_manager = JWTManager(app)
 app_context = app.app_context()
@@ -90,6 +99,16 @@ def delete():
     return Tasks.delete_taks(user_id, payload)
 
 
+@celery.task(name='check_task', run_every=timedelta(minutes=1))
+def check_task():
+    tasks_to_notify = Tasks.query.filter_by(notify=True).all()
+    for t in tasks_to_notify:
+        user_for_task = User.query.filter_by(id=t.user_id).first()
+        if t.date_end.date() == datetime.date.today() and t.date_end.hour == datetime.datetime.now().hour + 1:
+            bot.send_message(user_for_task.tg_id,f'Ваше задание {t.name} истекает в течение часа' )
+        if (t.date_end < datetime.datetime.utcnow() and t.status != 'Prosrok'):
+            t.status = 'Prosrok'
+            db.session.commit()
 
 @bot.message_handler(content_types=['text'])
 def get_text_messages(message):
